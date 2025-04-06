@@ -21,7 +21,7 @@
 #define PACKET_ANIMATION_TIME 300 // Faster animation for accepted packets
 #define PACKET_SPAWN_CHANCE 1  // Reduced packet spawn chance for slower gameplay
 #define BASE_PACKET_SPAWN_INTERVAL 1800  // Base interval between packet spawns (ms)
-#define ACCELERATION_FACTOR 0.25          // Each dead computer makes game faster (halves the interval)
+#define ACCELERATION_FACTOR 0.5          // Each dead computer makes game faster (halves the interval)
 #define HISCORE_FILENAME APP_DATA_PATH("hiscore.save")  // High score save file
 
 // Add upcoming packets queue to game state

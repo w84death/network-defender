@@ -48,13 +48,15 @@ void draw_help_screen(Canvas* canvas, int page) {
         canvas_draw_icon(canvas, 6, 22, &I_pc_monitor);
         canvas_draw_str(canvas, 20, 32, "- Computer system");
         
-        // Warning icon
-        canvas_draw_str(canvas, 10, 43, "!");
-        canvas_draw_str(canvas, 20, 43, "- Hack warning");
+        // Warning icons - show both PC and PC_using icons instead of "!"
+        canvas_draw_icon(canvas, 6, 40, &I_pc); 
+        canvas_draw_str(canvas, 20, 43, "- PC flashes when");
+        canvas_draw_icon(canvas, 6, 50, &I_pc_using);
+        canvas_draw_str(canvas, 20, 54, "  hack warning!");
         
-        // Active hack icon
-        canvas_draw_str(canvas, 10, 54, "!!!");
-        canvas_draw_str(canvas, 20, 54, "- Active hack attack");
+        // Bug icon for active hack
+        canvas_draw_icon(canvas, 6, 60, &I_bug);
+        canvas_draw_str(canvas, 20, 64, "- Active hack");
     } else {
         // Page 2: Gameplay instructions - more compact layout
         canvas_draw_str(canvas, 5, 10, "HOW TO PLAY:");
@@ -148,7 +150,7 @@ void draw_callback(Canvas* canvas, void* ctx) {
         
         // Show exclamation marks for new high score
         if(state->new_high_score) {
-            canvas_draw_str(canvas, 115, 45, "!!!");
+            canvas_draw_str(canvas, 120, 45, "!!!");
         }
 
         canvas_draw_str(canvas, 15, 55, "Press BACK to restart");
@@ -170,6 +172,14 @@ void draw_callback(Canvas* canvas, void* ctx) {
         } else if(state->hacking[i]) {
             // Use pc_using for computers currently being hacked
             canvas_draw_icon(canvas, x - 8, y - 8, &I_pc_using);
+        } else if(state->warn_start[i]) {
+            // Flash between normal PC and PC using icons for warning
+            uint32_t now = furi_get_tick();
+            if((now - state->warn_start[i]) / 500 % 2 == 0) {
+                canvas_draw_icon(canvas, x - 8, y - 8, &I_pc_using);
+            } else {
+                canvas_draw_icon(canvas, x - 8, y - 8, &I_pc);
+            }
         } else {
             // Use normal pc for healthy computers
             canvas_draw_icon(canvas, x - 8, y - 8, &I_pc);
@@ -177,16 +187,10 @@ void draw_callback(Canvas* canvas, void* ctx) {
 
         // Skip drawing packets and hacking warnings on dead computers
         if(!state->computer_dead[i]) {
-            // Hacking warning or active hack
-            uint32_t now = furi_get_tick();
-            if(state->warn_start[i] && !state->hacking[i]) {
-                if((now - state->warn_start[i]) / 500 % 2 == 0) { // Flash every 0.5s
-                    canvas_draw_str(canvas, x - 4, y - 12, "!");
-                }
-            } else if(state->hacking[i]) {
-                canvas_set_font(canvas, FontSecondary);
-                canvas_draw_str(canvas, x - 4, y - 12, "!!!");
-                canvas_set_font(canvas, FontPrimary);
+            // Only show the bug icon for active hacks - remove the warning "!" display
+            if(state->hacking[i]) {
+                // Use bug icon instead of "!!!" text for active hack
+                canvas_draw_icon(canvas, x - 6, y - 14, &I_bug);
             }
 
             // Draw packets at the system - Updated to show up to 4 packets per computer
