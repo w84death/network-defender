@@ -3,6 +3,7 @@
 #include <gui/gui.h>
 #include <input/input.h>
 #include <stdlib.h>
+#include <storage/storage.h>
 #include "p1x_network_defender_icons.h"
 
 // Game constants
@@ -19,6 +20,7 @@
 #define PACKET_SPAWN_CHANCE 1  // Reduced packet spawn chance for slower gameplay
 #define BASE_PACKET_SPAWN_INTERVAL 1800  // Base interval between packet spawns (ms)
 #define ACCELERATION_FACTOR 0.5          // Each dead computer makes game faster (halves the interval)
+#define HISCORE_FILENAME APP_DATA_PATH("hiscore.save")  // Updated path using APP_DATA_PATH macro
 
 // Add upcoming packets queue to game state
 #define MAX_UPCOMING_PACKETS 3
@@ -72,12 +74,64 @@ typedef struct {
     int current_state;       // Current game state
     int help_page;           // Help page number
     int menu_selection;      // Menu selection index
-    bool computer_dead[4];    // Is the computer dead (hacked)
+    bool computer_dead[4];   // Is the computer dead (hacked)
+    int high_score;          // High score from previous games
+    bool new_high_score;     // Flag to indicate if current score is a new high score
 } GameState;
 
 // Game over reasons
 #define GAME_OVER_HACK 1
 #define GAME_OVER_DDOS 2
+
+// Function to load high score from storage
+static bool load_high_score(GameState* state) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(storage);
+    bool result = false;
+
+    // Check if the high score file exists
+    if(storage_common_stat(storage, HISCORE_FILENAME, NULL) == FSE_OK) {
+        if(storage_file_open(file, HISCORE_FILENAME, FSAM_READ, FSOM_OPEN_EXISTING)) {
+            uint16_t bytes_read = storage_file_read(file, &state->high_score, sizeof(int));
+            result = (bytes_read == sizeof(int));
+        }
+    } else {
+        // If file doesn't exist, initialize high score to 0
+        state->high_score = 0;
+    }
+    
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+    
+    return result;
+}
+
+// Function to save high score to storage
+static bool save_high_score(GameState* state) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(storage);
+    bool result = false;
+    
+    // Make sure app data directory exists
+    storage_common_mkdir(storage, APP_DATA_PATH(""));
+    
+    // Create the file and write high score
+    if(storage_file_open(file, HISCORE_FILENAME, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        uint16_t bytes_written = storage_file_write(file, &state->high_score, sizeof(int));
+        result = (bytes_written == sizeof(int));
+        // Debug: Print to log
+        FURI_LOG_I("NetDefender", "Saved high score: %d, result: %d", state->high_score, result);
+    } else {
+        FURI_LOG_E("NetDefender", "Failed to save high score: %d", state->high_score);
+    }
+    
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+    
+    return result;
+}
 
 // Forward declaration of draw_upcoming_packets
 static void draw_upcoming_packets(Canvas* canvas, GameState* state);
@@ -93,6 +147,7 @@ static void reset_game_state(GameState* state) {
     state->last_packet_spawn_time = furi_get_tick();
     state->menu_selection = 0;
     state->help_page = 0;
+    state->new_high_score = false; // Reset new high score flag
     for(int i = 0; i < 4; i++) {
         state->hacking[i] = false;
         state->hack_start[i] = 0;
@@ -108,6 +163,12 @@ static void reset_game_state(GameState* state) {
 // Initialize game state
 static void game_init(GameState* state) {
     state->current_state = GAME_STATE_TITLE;
+    state->high_score = 0;
+    state->new_high_score = false;
+    
+    // Load high score from storage
+    load_high_score(state);
+    
     reset_game_state(state);
 }
 
@@ -207,11 +268,22 @@ static void draw_callback(Canvas* canvas, void* ctx) {
             canvas_draw_str(canvas, 15, 35, "DDOS attack!");
         }
 
+        // Display score and high score on the same line
         char score_text[32];
         snprintf(score_text, sizeof(score_text), "Score: %d", state->score);
-        canvas_draw_str(canvas, 15, 50, score_text);
+        canvas_draw_str(canvas, 15, 45, score_text);
+        
+        // Display high score next to current score
+        char hiscore_text[32];
+        snprintf(hiscore_text, sizeof(hiscore_text), "HI: %04d", state->high_score);
+        canvas_draw_str(canvas, 80, 45, hiscore_text);
+        
+        // Show exclamation marks for new high score
+        if(state->new_high_score) {
+            canvas_draw_str(canvas, 115, 45, "!!!");
+        }
 
-        canvas_draw_str(canvas, 15, 60, "Press BACK to restart");
+        canvas_draw_str(canvas, 15, 55, "Press BACK to restart");
         return;
     }
 
@@ -308,6 +380,11 @@ static void draw_callback(Canvas* canvas, void* ctx) {
     // Draw score
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, score_x, 10, score_text);
+    
+    // Draw high score in the corner
+    char hiscore_text[16];
+    snprintf(hiscore_text, sizeof(hiscore_text), "HI: %04d", state->high_score);
+    canvas_draw_str(canvas, 2, 10, hiscore_text);
 }
 
 // Input handling
@@ -482,6 +559,14 @@ static void update_game(GameState* state) {
             if(all_dead || dead_count >= 3) {
                 state->game_over = true;
                 state->game_over_reason = GAME_OVER_HACK;
+                
+                // Check for high score
+                if(state->score > state->high_score) {
+                    state->high_score = state->score;
+                    state->new_high_score = true;
+                    save_high_score(state);
+                }
+                
                 furi_hal_vibro_on(true); // Long vibration for game over
                 furi_delay_ms(500);
                 furi_hal_vibro_on(false);
@@ -555,6 +640,13 @@ static void update_game(GameState* state) {
     if(total_packets >= DDOS_LIMIT || computer_overflow) {
         state->game_over = true;
         state->game_over_reason = GAME_OVER_DDOS;
+        
+        // Check for high score
+        if(state->score > state->high_score) {
+            state->high_score = state->score;
+            state->new_high_score = true;
+            save_high_score(state);
+        }
         
         // Vibrate to indicate game over
         furi_hal_vibro_on(true);
