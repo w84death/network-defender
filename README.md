@@ -20,14 +20,14 @@ You play as a network administrator protecting four computer systems from cyber 
 
 ### Icons and Visual Indicators
 
-- ![Packet] - Data packet that needs to be processed
-- ![Computer] - Healthy computer system
-- ![Warning] - Computer flashing between normal and active states indicates a hack warning
-- ![Hacked] - Computer with active hack in progress
-- ![Dead] - Fully compromised (dead) computer 
-- ![Bug] - Indicates an active hack in progress
-- ![Server] - Central server that processes accepted packets
-- ![Player] - Your character (network admin) that moves between systems
+- ![Packet](images/packet.png) - Data packet that needs to be processed
+- ![Computer](images/pc.png) - Healthy computer system
+- ![Warning](images/pc_using.png) - Computer flashing between normal and active states indicates a hack warning
+- ![Hacked](images/pc_hacked.png) - Computer with active hack in progress
+- ![Dead](images/pc_hacked.png) - Fully compromised (dead) computer 
+- ![Bug](images/bug.png) - Indicates an active hack in progress
+- ![Server](images/server.png) - Central server that processes accepted packets
+- ![Player](images/player_left.png) - Your character (network admin) that moves between systems
 
 ### Game States
 
