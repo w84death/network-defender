@@ -1,3 +1,6 @@
+v1.2:
+- rebuilt against firmware 1.5.1 (API 88.2) for compatibility
+- help screen improvements
 v1.1:
 - local high-scores (saved on device)
 - updated graphics
